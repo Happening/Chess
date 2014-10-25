@@ -81,11 +81,11 @@ renderOverview = !->
 
 					Dom.onTap !->
 						Page.nav game.key()
-			
+
 		, (game) ->
 			if Plugin.userId() in [game.get('list0'), game.get('list1')]
 				-game.get('order')
-	
+
 	Ui.bigButton tr("New game"), !->
 		Modal.show tr("Challenge opponent"), !->
 			Dom.style width: '80%'
@@ -152,9 +152,12 @@ renderGame = (gameId) !->
 			Dom.style
 				boxShadow: '0 0 8px #000'
 				width: "#{size*8}px"
-			for i in [7..0] then do (i) !->
+
+			range = [[7..0],[0..7]]
+			range.reverse() if game.get('black') == Plugin.userId()
+			for i in range[0] then do (i) !->
 				Dom.div !->
-					for j in [0..7] then do (j) !->
+					for j in range[1] then do (j) !->
 						Dom.div !->
 							Dom.style
 								display: 'inline-block'
@@ -212,7 +215,7 @@ renderGame = (gameId) !->
 
 		else
 			turn = game.get('turn')
-			
+
 			if game.get(turn) is Plugin.userId()
 				Dom.text tr("Your turn - move a %1 piece, or", turn)
 			else
@@ -227,7 +230,7 @@ renderGame = (gameId) !->
 
 				#Ui.bigButton tr("Offer draw"), !->
 				#	Server.call 'xx'
-	
+
 	editingItem = Obs.create(false)
 	Dom.div !->
 		Dom.style display_: 'box', _boxAlign: 'center'
@@ -305,5 +308,3 @@ renderGame = (gameId) !->
 						Dom.style _boxFlex: 1
 						Dom.text comment
 		, (entry) -> -entry.key()
-
-
