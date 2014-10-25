@@ -152,10 +152,12 @@ renderGame = (gameId) !->
 			Dom.style
 				boxShadow: '0 0 8px #000'
 				width: "#{size*8}px"
-			range = if game.get('black') == Plugin.userId() then [0..7] else [7..0]
-			for i in range.slice(0) then do (i) !->
+
+			range = [[7..0],[0..7]]
+			range.reverse() if game.get('black') == Plugin.userId()
+			for i in range[0] then do (i) !->
 				Dom.div !->
-					for j in range.slice(0).reverse() then do (j) !->
+					for j in range[1] then do (j) !->
 						Dom.div !->
 							Dom.style
 								display: 'inline-block'
