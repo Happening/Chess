@@ -1,4 +1,6 @@
 Db = require 'db'
+attackedw = {}
+attackedb = {}
 
 exports.init = !->
 	Db.shared.set 'board', do ->
@@ -12,6 +14,7 @@ exports.init = !->
 	Db.shared.set 'moveId', 1
 	Db.shared.set 'castling', {wk: true, wq: true, bk: true, bq: true}
 		# indicates white/black king/queenside castling still possible
+
 
 exports.move = (from, to, promotionPiece='q') ->
 	boardRef = Db.shared.ref('board')
@@ -88,6 +91,10 @@ exports.isCheck = isCheck = (board, forColor) ->
 				attacked[move] = true
 		else if square is forColor + 'k'
 			kingLoc = loc
+	if forColor is 'w'
+		attackedw = attacked
+	else
+		attackedb = attacked
 	if attacked[kingLoc]
 		kingLoc
 
@@ -160,7 +167,13 @@ findMoves = (board, base) ->
 			# check castling
 			for side,x of {k:1, q:-1}
 				if Db.shared?.peek('castling', color+side) and findMove(x,0,null)
-					# todo: check for check
+					if side is 'q' and !findMove(-3,0,null)
+						continue
+					if color is 'w'
+						if attackedw[locDelta(base, x, 0)]
+							continue
+					else if attackedb[locDelta(base, x, 0)]
+						continue
 					findMove(x+x, 0, true, 'castle')
 
 	else if piece is 'r'
