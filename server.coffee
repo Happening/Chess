@@ -18,15 +18,18 @@ exports.onInstall = (config) !->
 			black: +config.black
 			challenge: challenge
 
-		Event.create
-			unit: 'game'
-			text: "Chess: #{Plugin.userName()} wants to play"
-			#text_you: "Chess: you challenged #{xx}"
-			for: x=[+config.white, +config.black]
-			new: [-Plugin.userId()]
-
 		accept(Plugin.userId())
 			# todo: this currently shows some error due to a framework Db issue
+
+exports.getInitialEvent = ->
+	opponentId = if Db.shared.get('white') is Plugin.userId()
+			Db.shared.get('black')
+		else
+			Db.shared.get('white')
+	for: [Db.shared.get('white'), Db.shared.get('black')]
+	text: "Chess: #{Plugin.userName()} challenges you"
+	sender: Plugin.userId()
+	senderText: "Chess: you challenged #{Plugin.userName(opponentId)}"
 
 exports.onUpgrade = !->
 	if !Db.shared.get('board') and game=Db.shared.get('game')
@@ -51,9 +54,8 @@ accept = (userId) !->
 		log 'game begin'
 		Db.shared.remove 'challenge'
 		Event.create
-			unit: 'game'
-			text: "Chess game has begun!"
 			for: [Db.shared.get('white'), Db.shared.get('black')]
+			text: "Chess game has begun!"
 		Chess.init()
 
 exports.client_move = (from, to, promotionPiece) !->
@@ -62,9 +64,8 @@ exports.client_move = (from, to, promotionPiece) !->
 		m = Chess.move from, to, promotionPiece
 
 		Event.create
-			unit: 'move'
-			text: "Chess: #{Plugin.userName()} moved #{m}"
-			#text_you: "Chess: you moved #{m}"
 			for: [Db.shared.get('white'), Db.shared.get('black')]
-			new: [-Plugin.userId()]
+			text: "Chess: #{Plugin.userName()} moved #{m}"
+			sender: Plugin.userId()
+			senderText: "Chess: you moved #{m}"
 

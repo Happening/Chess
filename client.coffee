@@ -13,13 +13,28 @@ Chess = require 'chess'
 {tr} = require 'i18n'
 
 exports.renderSettings = !->
-	if Db.shared
-		Dom.text tr("Game has started")
+	Dom.div !->
+		Dom.style margin: '16px -8px'
 
-	else
-		selectMember
-			name: 'opponent'
-			title: tr("Opponent")
+		if Db.shared
+			Ui.emptyText tr("Game has started")
+		else
+			Form.sep()
+			userCnt = Plugin.users.count().get()
+			selUserId = null
+			if userCnt is 2
+				for userId, v of Plugin.users.get()
+					if +userId isnt Plugin.userId()
+						selUserId = userId
+						break
+
+			selectMember
+				name: 'opponent'
+				value: selUserId
+				title: tr("Opponent")
+			Form.sep()
+			Form.condition (val) ->
+				tr("Please select an opponent") if !val.opponent
 
 exports.render = !->
 	whiteId = Db.shared.get('white')
@@ -62,24 +77,31 @@ exports.render = !->
 					color: 'inherit'
 					fontWeight: 'normal'
 				id = Db.shared.get(side)
-				if id is Plugin.userId()
-					Dom.text tr("You")
-				else
-					Dom.text Plugin.userName(id)
-
-				if result = Db.shared.get('result')
-					Dom.style fontWeight: 'bold'
-					if result is side
-						Dom.text " - wins!"
-					else if result is 'draw'
-						Dom.text " - draw"
-					else if result
-						Dom.text " - lost"
-
-				else if Db.shared.get('turn') is side
+				Dom.div !->
+					Dom.style
+						Box: 'inline middle'
+						padding: '6px'
+					Ui.avatar Plugin.userAvatar(id)
 					if id is Plugin.userId()
-						Dom.style color: Plugin.colors().highlight, fontWeight: 'bold'
-					Dom.text " - to move"
+						Dom.text tr("You")
+					else
+						Dom.text Plugin.userName(id)
+						Dom.onTap !->
+							Plugin.userInfo(id)
+
+					if result = Db.shared.get('result')
+						Dom.style fontWeight: 'bold'
+						if result is side
+							Dom.text " - wins!"
+						else if result is 'draw'
+							Dom.text " - draw"
+						else if result
+							Dom.text " - lost"
+
+					else if Db.shared.get('turn') is side
+						if id is Plugin.userId()
+							Dom.style color: Plugin.colors().highlight, fontWeight: 'bold'
+						Dom.text " - to move"
 
 		renderSide if isBlack then 'white' else 'black'
 		
@@ -214,19 +236,17 @@ selectMember = (opts) !->
 			Dom.style color: (if v then 'inherit' else '#aaa')
 			Dom.text (if v then Plugin.userName(v) else tr("Nobody"))
 		if v
-			Ui.avatar Plugin.userAvatar(v), !->
-				Dom.style position: 'absolute', right: '6px', top: '50%', marginTop: '-20px'
+			Ui.avatar Plugin.userAvatar(v), style: position: 'absolute', right: '6px', top: '50%', marginTop: '-20px'
 
 		Dom.onTap !->
-			Modal.show opts.selectTitle||tr("Select member"), !->
+			Modal.show opts.selectTitle||tr("Select opponent"), !->
 				Dom.style width: '80%'
 				Dom.div !->
 					Dom.style
 						maxHeight: '40%'
-						overflow: 'auto'
-						_overflowScrolling: 'touch'
 						backgroundColor: '#eee'
 						margin: '-12px'
+					Dom.overflow()
 
 					Plugin.users.iterate (user) !->
 						Ui.item !->
@@ -249,6 +269,8 @@ selectMember = (opts) !->
 								handleChange user.key()
 								value.set user.key()
 								Modal.remove()
+					, (user) ->
+						+user.key() if +user.key() isnt Plugin.userId()
 			, (choice) !->
 				log 'choice', choice
 				if choice is 'clear'

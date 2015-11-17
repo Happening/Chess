@@ -145,7 +145,7 @@ findMoves = (board, base) ->
 				findMove(0, y*2, true)
 		last = Db.shared.peek('last')
 		for x in [-1,1]
-			enPassant = last and (last[1] is locDelta(base,x,0)) and board[last[1]][1] is 'p'
+			enPassant = last and (locDelta(last[0],0,-y*2) is last[1]) and (last[1] is locDelta(base,x,0)) and board[last[1]][1] is 'p'
 			findMove(x, y, (if enPassant then undefined else false), (if isPromotion then 'promotion' else if enPassant then 'enPassant'))
 
 	else if piece is 'n'
