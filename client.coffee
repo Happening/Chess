@@ -1,72 +1,67 @@
+Comments = require 'comments'
 Db = require 'db'
 Dom = require 'dom'
 Modal = require 'modal'
 Obs = require 'obs'
-Plugin = require 'plugin'
+App = require 'app'
 Page = require 'page'
 Server = require 'server'
 Ui = require 'ui'
 Form = require 'form'
 Time = require 'time'
-Social = require 'social'
 Chess = require 'chess'
 {tr} = require 'i18n'
 
-exports.renderSettings = !->
-	Dom.div !->
-		Dom.style margin: '16px -8px'
+exports.renderSettings = if Db.shared then false else !->
+	userCnt = App.users.count().get()
+	selUserId = null
+	if userCnt is 2
+		for userId, v of App.users.get()
+			if +userId isnt App.userId()
+				selUserId = userId
+				break
 
-		if Db.shared
-			Ui.emptyText tr("Game has started")
-		else
-			Form.sep()
-			userCnt = Plugin.users.count().get()
-			selUserId = null
-			if userCnt is 2
-				for userId, v of Plugin.users.get()
-					if +userId isnt Plugin.userId()
-						selUserId = userId
-						break
+	selectMember
+		name: 'opponent'
+		value: selUserId
+		title: tr("Opponent")
 
-			selectMember
-				name: 'opponent'
-				value: selUserId
-				title: tr("Opponent")
-			Form.sep()
-			Form.condition (val) ->
-				tr("Please select an opponent") if !val.opponent
+	Form.condition (val) ->
+		tr("Please select an opponent") if !val.opponent
+
 
 exports.render = !->
 	whiteId = Db.shared.get('white')
 	blackId = Db.shared.get('black')
-	color = if Plugin.userId() is whiteId
+	color = if App.userId() is whiteId
 			'white'
-		else if Plugin.userId() is blackId
+		else if App.userId() is blackId
 			'black'
+	Obs.observe !->
+		Page.setTitle tr("Chess - %1 to move", Db.shared.get('turn'));
 
 	if challenge=Db.shared.get('challenge')
 		Dom.div !->
 			Dom.style
-				padding: '8px'
 				textAlign: 'center'
 				fontSize: '120%'
 
 			Dom.text tr("%1 (white) vs %2 (black), no time limit",
-				Plugin.userName(whiteId), Plugin.userName(blackId))
+				App.userName(whiteId), App.userName(blackId))
 
-			if challenge[Plugin.userId()]
-				Dom.div tr("%1 challenged you for a game of Chess.", Plugin.userName(Plugin.ownerId()))
+			if challenge[App.userId()]
+				Dom.div tr("%1 challenged you for a game of Chess.", App.userName(App.ownerId()))
 
 				Ui.bigButton tr("Accept"), !->
 					Server.call 'accept'
 
 			else
 				break for id of challenge
-				Dom.div tr("Waiting for %1 to accept...", Plugin.userName(id))
+				Dom.div tr("Waiting for %1 to accept...", App.userName(id))
 
 	else
 
-		isBlack = Db.shared.get('black') is Plugin.userId() and Db.shared.get('white') isnt Plugin.userId()
+		isBlack = Db.shared.get('black') is App.userId() and Db.shared.get('white') isnt App.userId()
 
 		renderSide = (side) !->
 			Dom.div !->
@@ -81,13 +76,13 @@ exports.render = !->
 					Dom.style
 						Box: 'inline middle'
 						padding: '6px'
-					Ui.avatar Plugin.userAvatar(id)
-					if id is Plugin.userId()
+					Ui.avatar App.userAvatar(id)
+					if id is App.userId()
 						Dom.text tr("You")
 					else
-						Dom.text Plugin.userName(id)
+						Dom.text App.userName(id)
 						Dom.onTap !->
-							Plugin.userInfo(id)
+							App.showMemberInfo(id)
 
 					if result = Db.shared.get('result')
 						Dom.style fontWeight: 'bold'
@@ -99,23 +94,21 @@ exports.render = !->
 							Dom.text " - lost"
 
 					else if Db.shared.get('turn') is side
-						if id is Plugin.userId()
-							Dom.style color: Plugin.colors().highlight, fontWeight: 'bold'
+						if id is App.userId()
+							Dom.style color: App.colors().highlight, fontWeight: 'bold'
 						Dom.text " - to move"
 
 		renderSide if isBlack then 'white' else 'black'
-		
+
 		Dom.div !->
 			Dom.style
-				display_: 'box'
-				_boxAlign: 'center'
-				_boxPack: 'center'
+				Box: 'center'
 				margin: '4px 0'
 
 			selected = Obs.create false
 			markers = Obs.create {}
 				# chess field index indicating last-moved-piece, king-under-attack, selected, possible-move
-		
+
 			Obs.observe !->
 				if last=Db.shared.get('last')
 					markers.set last[0], 'last'
@@ -133,11 +126,11 @@ exports.render = !->
 					markers.set {}
 
 			Dom.div !->
-				size = 0|Math.max(200, Math.min(Dom.viewport.get('width')-16, 480)) / 8
+				size = 0|Math.max(200, Math.min(Page.width()-16, 480)) / 8
 				Dom.cls 'board'
 				Dom.style
 					width: "#{size*8}px"
-		
+
 				(if isBlack then '12345678' else '87654321').split('').forEach (y,yi) !->
 					Dom.div !->
 						(if isBlack then 'hgfedcba' else 'abcdefgh').split('').forEach (x,xi) !->
@@ -157,9 +150,9 @@ exports.render = !->
 											left: if piece then '5%' else '25%'
 											top: if piece then '5%' else '25%'
 											background: if marker in ['last', 'check']
-													Plugin.colors().bar
+													App.colors().bar
 												else
-													Plugin.colors().highlight
+													App.colors().highlight
 											opacity: if marker is 'last' then .6 else 1
 											borderRadius: '999px'
 
@@ -171,7 +164,7 @@ exports.render = !->
 											top: 0
 											width: '100%'
 											height: '100%'
-											background: "url(#{Plugin.resourceUri piece+'.png'}) no-repeat 50% 50%"
+											background: "url(#{App.resourceUri piece+'.png'}) no-repeat 50% 50%"
 											backgroundSize: "#{0|size*.75}px"
 
 								Dom.onTap !->
@@ -199,8 +192,20 @@ exports.render = !->
 
 		renderSide if isBlack then 'black' else 'white'
 
-	Social.renderComments()
-	
+	Comments.enable
+		legacyStore: "default"
+		messages:
+			move: (c) ->
+				Dom.text tr("%1 moved %2", App.userName(c.u), c.custom.move) + " "
+				Dom.div !->
+					Dom.style
+						height: '15px'
+						width: '15px'
+						background: "url(#{App.resourceUri c.custom.piece+'.png'}) no-repeat 50% 50%"
+						backgroundSize: "15px"
+						display: 'inline-block'
+						margin: '-1px 0 -2px'
+				return ""
 
 choosePiece = (pieces, cb) !->
 	require('modal').show tr("Choose piece"), !->
@@ -211,7 +216,7 @@ choosePiece = (pieces, cb) !->
 					height: '40px'
 					width: '40px'
 					margin: '4px'
-					background: "url(#{Plugin.resourceUri piece+'.png'}) no-repeat 50% 50%"
+					background: "url(#{App.resourceUri piece+'.png'}) no-repeat 50% 50%"
 					backgroundSize: '32px'
 
 				Dom.onTap !->
@@ -224,31 +229,34 @@ choosePiece = (pieces, cb) !->
 
 # input that handles selection of a member
 selectMember = (opts) !->
+	usersAvailable = Obs.create false
+	Obs.observe !->
+		usersAvailable.set App.users.count().get() > 1
 	opts ||= {}
 	[handleChange, initValue] = Form.makeInput opts, (v) -> 0|v
 
 	value = Obs.create(initValue)
+	Obs.observe !->
+		if !App.users.get(value.get())
+			value.set false
+		handleChange value.get()
+
 	Form.box !->
 		Dom.style fontSize: '125%', paddingRight: '56px'
 		Dom.text opts.title||tr("Selected member")
 		v = value.get()
 		Dom.div !->
 			Dom.style color: (if v then 'inherit' else '#aaa')
-			Dom.text (if v then Plugin.userName(v) else tr("Nobody"))
+			Dom.text (if v then App.userName(v) else tr("Nobody"))
 		if v
-			Ui.avatar Plugin.userAvatar(v), style: position: 'absolute', right: '6px', top: '50%', marginTop: '-20px'
+			Ui.avatar App.userAvatar(v), style: position: 'absolute', right: '-30px', top: '50%', marginTop: '-16px'
 
 		Dom.onTap !->
-			Modal.show opts.selectTitle||tr("Select opponent"), !->
-				Dom.style width: '80%'
-				Dom.div !->
-					Dom.style
-						maxHeight: '40%'
-						backgroundColor: '#eee'
-						margin: '-12px'
-					Dom.overflow()
-
-					Plugin.users.iterate (user) !->
+			if !usersAvailable.get()
+				Modal.show "First select some people to add to the app"
+			else
+				Modal.show opts.selectTitle||tr("Select opponent"), !->
+					App.users.iterate (user) !->
 						Ui.item !->
 							Ui.avatar user.get('avatar')
 							Dom.text user.get('name')
@@ -262,21 +270,24 @@ selectMember = (opts) !->
 										padding: '0 10px'
 										textAlign: 'right'
 										fontSize: '150%'
-										color: Plugin.colors().highlight
+										color: App.colors().highlight
 									Dom.text "✓"
 
 							Dom.onTap !->
-								handleChange user.key()
 								value.set user.key()
 								Modal.remove()
 					, (user) ->
-						+user.key() if +user.key() isnt Plugin.userId()
-			, (choice) !->
-				log 'choice', choice
-				if choice is 'clear'
-					handleChange ''
-					value.set ''
-			, ['cancel', tr("Cancel"), 'clear', tr("Clear")]
+						+user.key() if +user.key() isnt App.userId()
+				, (choice) !->
+					log 'choice', choice
+					if choice is 'clear'
+						handleChange ''
+						value.set ''
+				, ['cancel', tr("Cancel"), 'clear', tr("Clear")]
+	# Autoselect first user
+	App.users.iterate (user) !->
+		if +user.key() isnt 1 and (!value.peek() or value.peek() is 0)
+			value.set user.key()
 
 Dom.css
 	'.board':

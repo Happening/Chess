@@ -1,35 +1,37 @@
+Comments = require 'comments'
 Db = require 'db'
-Plugin = require 'plugin'
+App = require 'app'
 Event = require 'event'
 Chess = require 'chess'
+{tr} = require 'i18n'
 
 exports.onInstall = (config) !->
-	if config and config.opponent
-		config = if Math.random()>.5
-				{white: Plugin.userId(), black: config.opponent}
-			else
-				{black: Plugin.userId(), white: config.opponent}
-	if config and config.white and config.black
+	if config and (black = +config.opponent)
+		white = App.userId()
+		if Math.random()>.5
+			[black,white] = [white,black]
 		challenge = {}
-		challenge[+config.white] = true
-		challenge[+config.black] = true
+		challenge[white] = true
+		challenge[black] = true
 		Db.shared.set
-			white: +config.white
-			black: +config.black
+			white: white
+			black: black
 			challenge: challenge
+		App.setTitle App.userName(white) + ' vs ' + App.userName(black)
 
-		accept(Plugin.userId())
+		accept(App.userId())
 			# todo: this currently shows some error due to a framework Db issue
 
+
 exports.getInitialEvent = ->
-	opponentId = if Db.shared.get('white') is Plugin.userId()
+	opponentId = if Db.shared.get('white') is App.userId()
 			Db.shared.get('black')
 		else
 			Db.shared.get('white')
 	for: [Db.shared.get('white'), Db.shared.get('black')]
-	text: "Chess: #{Plugin.userName()} challenges you"
-	sender: Plugin.userId()
-	senderText: "Chess: you challenged #{Plugin.userName(opponentId)}"
+	text: "Chess: #{App.userName()} challenges you"
+	sender: App.userId()
+	senderText: "Chess: you challenged #{App.userName(opponentId)}"
 
 exports.onUpgrade = !->
 	if !Db.shared.get('board') and game=Db.shared.get('game')
@@ -41,11 +43,8 @@ exports.onUpgrade = !->
 exports.onConfig = !->
 	# currently, no config can be changed
 
-exports.getTitle = ->
-	Plugin.userName(Db.shared.get('white')) + ' vs ' + Plugin.userName(Db.shared.get('black'))
-
 exports.client_accept = !->
-	accept(Plugin.userId())
+	accept(App.userId())
 
 accept = (userId) !->
 	log 'accept', userId
@@ -60,12 +59,19 @@ accept = (userId) !->
 
 exports.client_move = (from, to, promotionPiece) !->
 	game = Db.shared.ref('game')
-	if Db.shared.get(Db.shared.get('turn')) is Plugin.userId()
+	if Db.shared.get(Db.shared.get('turn')) is App.userId()
 		m = Chess.move from, to, promotionPiece
 
 		Event.create
 			for: [Db.shared.get('white'), Db.shared.get('black')]
-			text: "Chess: #{Plugin.userName()} moved #{m}"
-			sender: Plugin.userId()
+			text: "Chess: #{App.userName()} moved #{m}"
+			sender: App.userId()
 			senderText: "Chess: you moved #{m}"
 
+	#write to comments
+	piece = Db.shared.get 'board', from
+	Comments.post
+		legacyStore: "default"
+		s: 'move'
+		u: App.userId() if Db.shared.get(Db.shared.get('turn')) is App.userId()
+		custom: {piece: piece, move: m}
